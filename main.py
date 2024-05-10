@@ -7,6 +7,7 @@ from sklearn import model_selection
 from sklearn.metrics import roc_auc_score
 from tensorflow.keras.initializers import Constant
 from tensorflow.keras.layers import Embedding, Input, Conv1D, GlobalMaxPooling1D, Dropout, Dense
+from tensorflow.keras.layers import LSTM
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import RMSprop
 from tensorflow.keras.preprocessing.sequence import pad_sequences
@@ -22,7 +23,7 @@ EMBEDDINGS_PATH = 'Embedding_file/glove.6B.100d.txt'
 EMBEDDINGS_DIMENSION = 100
 DROPOUT_RATE = 0.3
 LEARNING_RATE = 0.00005
-NUM_EPOCHS = 3
+NUM_EPOCHS = 10
 BATCH_SIZE = 128
 TOXICITY_COLUMN = 'target'
 TEXT_COLUMN = 'comment_text'
@@ -99,9 +100,9 @@ def create_model(word_index):
     embedding_layer = load_embedding_matrix(word_index)
     sequence_input = Input(shape=(MAX_SEQUENCE_LENGTH,), dtype='int32')
     embedded_sequences = embedding_layer(sequence_input)
-    x = Conv1D(128, 5, activation='relu')(embedded_sequences)
-    x = GlobalMaxPooling1D()(x)
-    x = Dense(128, activation='relu')(x)
+
+    # 使用LSTM层替换原先的CNN层
+    x = LSTM(64)(embedded_sequences)  # 你可以根据需要调整LSTM单元的数量
     x = Dropout(DROPOUT_RATE)(x)
     preds = Dense(2, activation='softmax')(x)
 
