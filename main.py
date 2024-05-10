@@ -12,7 +12,6 @@ from tensorflow.keras.optimizers import RMSprop
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.preprocessing.text import Tokenizer
 from tensorflow.keras.utils import to_categorical
-from tensorflow.python.keras.regularizers import l1_l2
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
@@ -23,7 +22,7 @@ EMBEDDINGS_PATH = 'Embedding_file/glove.6B.100d.txt'
 EMBEDDINGS_DIMENSION = 100
 DROPOUT_RATE = 0.3
 LEARNING_RATE = 0.00005
-NUM_EPOCHS = 10
+NUM_EPOCHS = 3
 BATCH_SIZE = 128
 TOXICITY_COLUMN = 'target'
 TEXT_COLUMN = 'comment_text'
@@ -100,9 +99,9 @@ def create_model(word_index):
     embedding_layer = load_embedding_matrix(word_index)
     sequence_input = Input(shape=(MAX_SEQUENCE_LENGTH,), dtype='int32')
     embedded_sequences = embedding_layer(sequence_input)
-    x = Conv1D(128, 5, activation='relu', kernel_regularizer=l1_l2(0.001))(embedded_sequences)
+    x = Conv1D(128, 5, activation='relu')(embedded_sequences)
     x = GlobalMaxPooling1D()(x)
-    x = Dense(128, activation='relu', kernel_regularizer=l1_l2(0.001))(x)
+    x = Dense(128, activation='relu')(x)
     x = Dropout(DROPOUT_RATE)(x)
     preds = Dense(2, activation='softmax')(x)
 
