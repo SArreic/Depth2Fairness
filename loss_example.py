@@ -1,5 +1,7 @@
 import pandas as pd
 import numpy as np
+import torch
+import torch.nn as nn
 
 
 def convert_to_bool(df, col_name):
