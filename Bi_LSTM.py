@@ -1,8 +1,11 @@
+import re
 import warnings
 
 import numpy as np
 import pandas as pd
 from keras.src.layers import Bidirectional
+from nltk import WordNetLemmatizer, word_tokenize
+from nltk.corpus import stopwords
 from sklearn import model_selection
 from sklearn.metrics import roc_auc_score
 from tensorflow.keras.initializers import Constant
@@ -12,6 +15,12 @@ from tensorflow.keras.optimizers import RMSprop
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.preprocessing.text import Tokenizer
 from tensorflow.keras.utils import to_categorical
+import nlpaug.augmenter.word as naw
+import nltk
+
+# nltk.download('stopwords')
+# nltk.download('punkt')
+# nltk.download('wordnet')
 
 # Suppress deprecated warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -23,10 +32,36 @@ EMBEDDINGS_PATH = 'Embedding_file/glove.6B.100d.txt'
 EMBEDDINGS_DIMENSION = 100
 DROPOUT_RATE = 0.3
 LEARNING_RATE = 0.00005
-NUM_EPOCHS = 3
+NUM_EPOCHS = 1
 BATCH_SIZE = 128
 TOXICITY_COLUMN = 'target'
 TEXT_COLUMN = 'comment_text'
+
+# 初始化词形还原器和停用词列表
+lemmatizer = WordNetLemmatizer()
+stop_words = set(stopwords.words('english'))
+
+
+def clean_text(text):
+    # 去除标点和数字
+    text = re.sub(r'[\d\W]+', ' ', text)
+    # 分词
+    words = word_tokenize(text)
+    # 去除停用词并进行词形还原
+    words = [lemmatizer.lemmatize(word) for word in words if word not in stop_words]
+    return ' '.join(words)
+
+
+# 初始化同义词替换增强器
+synonym_aug = naw.SynonymAug(aug_src='wordnet')
+
+
+def augment_text(texts, augmenter, num_augmented=1):
+    augmented_texts = []
+    for text in texts:
+        augmented = augmenter.augment(text, n=num_augmented)
+        augmented_texts.extend(augmented if isinstance(augmented, list) else [augmented])
+    return augmented_texts
 
 
 def pad_text(texts, tokenizer):
@@ -42,6 +77,13 @@ def load_and_preprocess_data(filepath):
 
     # Ensure all comment_text values are strings
     data[TEXT_COLUMN] = data[TEXT_COLUMN].astype(str)
+
+    # 文本清洗和数据增强
+    data[TEXT_COLUMN] = data[TEXT_COLUMN].apply(clean_text)
+    # 假设我们只对训练集进行数据增强
+    augmented_texts = augment_text(data[TEXT_COLUMN], synonym_aug)
+    augmented_data = pd.DataFrame({TEXT_COLUMN: augmented_texts, TOXICITY_COLUMN: 0})  # 增强的文本暂时标记为非有害
+    data = pd.concat([data, augmented_data], ignore_index=True)
 
     # Convert target column and identity columns to boolean
     identity_columns = [
@@ -92,7 +134,7 @@ def load_embedding_matrix(word_index, embedding_path=EMBEDDINGS_PATH):
         num_words,
         EMBEDDINGS_DIMENSION,
         embeddings_initializer=Constant(embedding_matrix),
-        trainable=False
+        trainable=True
     )
     return embedding_layer
 

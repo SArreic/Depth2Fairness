@@ -23,7 +23,7 @@ EMBEDDINGS_PATH = 'Embedding_file/glove.6B.100d.txt'
 EMBEDDINGS_DIMENSION = 100
 DROPOUT_RATE = 0.3
 LEARNING_RATE = 0.00005
-NUM_EPOCHS = 3
+NUM_EPOCHS = 1
 BATCH_SIZE = 128
 TOXICITY_COLUMN = 'target'
 TEXT_COLUMN = 'comment_text'
@@ -34,30 +34,6 @@ def pad_text(texts, tokenizer):
     return pad_sequences(tokenizer.texts_to_sequences(texts), maxlen=MAX_SEQUENCE_LENGTH)
 
 
-# Data loading and preprocessing
-def load_and_preprocess_data(filepath):
-    # Load the data
-    data = pd.read_csv(filepath)
-    print(f'Loaded {len(data)} records')
-
-    # Ensure all comment_text values are strings
-    data[TEXT_COLUMN] = data[TEXT_COLUMN].astype(str)
-
-    # Convert target column and identity columns to boolean
-    identity_columns = [
-        'male', 'female', 'homosexual_gay_or_lesbian', 'christian', 'jewish',
-        'muslim', 'black', 'white', 'psychiatric_or_mental_illness']
-
-    def convert_to_bool(df, col_name):
-        df[col_name] = np.where(df[col_name] >= 0.5, True, False)
-
-    for col in [TOXICITY_COLUMN] + identity_columns:
-        convert_to_bool(data, col)
-
-    return data
-
-
-# Split the dataset
 def split_data(data):
     # Split the data into training and validation sets
     train_df, validate_df = model_selection.train_test_split(data, test_size=0.2)
@@ -92,7 +68,7 @@ def load_embedding_matrix(word_index, embedding_path=EMBEDDINGS_PATH):
         num_words,
         EMBEDDINGS_DIMENSION,
         embeddings_initializer=Constant(embedding_matrix),
-        trainable=False
+        trainable=True
     )
     return embedding_layer
 
@@ -177,9 +153,9 @@ def calculate_final_score(overall_auc, bias_auc_dict, POWER=-5, OVERALL_MODEL_WE
 
 # Main function
 def main():
-    # Load and preprocess data
-    train_data_filepath = 'Data/train.csv'
-    data = load_and_preprocess_data(train_data_filepath)
+    # Load the preprocessed data
+    preprocessed_data_filepath = 'Data/preprocessed_train.csv'
+    data = pd.read_csv(preprocessed_data_filepath)
 
     # Split the dataset
     train_df, validate_df = split_data(data)
