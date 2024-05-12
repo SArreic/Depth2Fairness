@@ -64,8 +64,12 @@ def load_and_preprocess_data(filepath):
     data = pd.concat([data, augmented_data], ignore_index=True)
 
     identity_columns = [
-        'male', 'female', 'homosexual_gay_or_lesbian', 'christian', 'jewish',
-        'muslim', 'black', 'white', 'psychiatric_or_mental_illness']
+        'male', 'female', 'bisexual', 'homosexual_gay_or_lesbian', 'heterosexual',
+        'transgender', 'other_gender', 'other_sexual_orientation', 'atheist',
+        'buddhist', 'christian', 'jewish', 'muslim', 'other_religion', 'black',
+        'white', 'asian', 'latino', 'hindu', 'other_race_or_ethnicity',
+        'physical_disability', 'psychiatric_or_mental_illness',
+        'intellectual_or_learning_disability', 'other_disability']
 
     def convert_to_bool(df, col_name):
         df[col_name] = np.where(df[col_name] >= 0.5, True, False)
