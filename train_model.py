@@ -12,6 +12,7 @@ from tensorflow.keras.optimizers import RMSprop
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.preprocessing.text import Tokenizer
 from tensorflow.keras.utils import to_categorical
+from tqdm import tqdm
 
 # Suppress deprecated warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -46,7 +47,7 @@ def load_embedding_matrix(word_index, embedding_path=EMBEDDINGS_PATH):
     # Load pre-trained word vectors
     embeddings_index = {}
     with open(embedding_path, 'r', encoding='utf8') as f:
-        for line in f:
+        for line in tqdm(f, desc="Loading embeddings", unit=" lines"):
             values = line.split()
             word = values[0]
             coefs = np.asarray(values[1:], dtype='float32')
@@ -155,14 +156,18 @@ def calculate_final_score(overall_auc, bias_auc_dict, POWER=-5, OVERALL_MODEL_WE
 def main():
     # Load the preprocessed data
     preprocessed_data_filepath = 'Data/preprocessed_train.csv'
-    data = pd.read_csv(preprocessed_data_filepath)
+    data = pd.read_csv(preprocessed_data_filepath, dtype={TEXT_COLUMN: str}, na_filter=False)
 
     # Split the dataset
     train_df, validate_df = split_data(data)
 
+    # Clean the text data to ensure it is all strings
+    train_df[TEXT_COLUMN] = train_df[TEXT_COLUMN].astype(str)
+    validate_df[TEXT_COLUMN] = validate_df[TEXT_COLUMN].astype(str)
+
     # Create a tokenizer for text
     tokenizer = Tokenizer(num_words=MAX_NUM_WORDS)
-    tokenizer.fit_on_texts(train_df[TEXT_COLUMN])
+    tokenizer.fit_on_texts(tqdm(train_df[TEXT_COLUMN], desc="Tokenizing text"))
 
     # Create and train the model
     model, history = create_and_train_model(train_df, validate_df, tokenizer)

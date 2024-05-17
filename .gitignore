@@ -161,3 +161,8 @@ cython_debug/
 /Data/
 /Embedding_file/
 final_submission.csv
+*.csv
+task_mitigation/model/bert-base-uncased/tf_model.h5
+task_mitigation/model/bert-base-uncased/model.safetensors
+task_mitigation/model/bert-base-uncased/flax_model.msgpack
+task_mitigation/model/bert-base-uncased/pytorch_model.bin

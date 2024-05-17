@@ -1,6 +1,7 @@
 import re
 import numpy as np
 import pandas as pd
+import spacy
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from nltk import WordNetLemmatizer, word_tokenize
 from nltk.corpus import stopwords
@@ -22,13 +23,46 @@ TEXT_COLUMN = 'comment_text'
 lemmatizer = WordNetLemmatizer()
 stop_words = set(stopwords.words('english'))
 
+nlp = spacy.load('en_core_web_sm')
+
+misspell_dict = {"aren't": "are not", "can't": "cannot", "couldn't": "could not",
+                 "didn't": "did not", "doesn't": "does not", "don't": "do not",
+                 "hadn't": "had not", "hasn't": "has not", "haven't": "have not",
+                 "he'd": "he would", "he'll": "he will", "he's": "he is",
+                 "i'd": "I had", "i'll": "I will", "i'm": "I am", "isn't": "is not",
+                 "it's": "it is", "it'll": "it will", "i've": "I have", "let's": "let us",
+                 "mightn't": "might not", "mustn't": "must not", "shan't": "shall not",
+                 "she'd": "she would", "she'll": "she will", "she's": "she is",
+                 "shouldn't": "should not", "that's": "that is", "there's": "there is",
+                 "they'd": "they would", "they'll": "they will", "they're": "they are",
+                 "they've": "they have", "we'd": "we would", "we're": "we are",
+                 "weren't": "were not", "we've": "we have", "what'll": "what will",
+                 "what're": "what are", "what's": "what is", "what've": "what have",
+                 "where's": "where is", "who'd": "who would", "who'll": "who will",
+                 "who're": "who are", "who's": "who is", "who've": "who have",
+                 "won't": "will not", "wouldn't": "would not", "you'd": "you would",
+                 "you'll": "you will", "you're": "you are", "you've": "you have",
+                 "'re": " are", "wasn't": "was not", "we'll": " will", "tryin'": "trying"}
+
+
+def replace_typical_misspell(text):
+    misspell_re = re.compile('(%s)' % '|'.join(misspell_dict.keys()))
+
+    def replace(match):
+        return misspell_dict[match.group(0)]
+
+    return misspell_re.sub(replace, text)
+
 
 def clean_text(text):
-    """Remove punctuation and numbers, tokenize, remove stop words, and lemmatize"""
-    text = re.sub(r'[\d\W]+', ' ', text)
-    words = word_tokenize(text)
-    words = [lemmatizer.lemmatize(word) for word in words if word not in stop_words]
-    return ' '.join(words)
+    """Clean text by removing punctuation, numbers, and misspellings, and then lemmatizing using spaCy."""
+    text = text.lower()  # Convert to lowercase
+    text = replace_typical_misspell(text)  # Correct misspellings
+    text = re.sub(r'\d+', ' ', text)  # Remove numbers (keep words with apostrophes)
+    doc = nlp(text)  # Process text with spaCy
+    lemmatized = [token.lemma_.lower().strip() for token in doc if token.lemma_ != "-PRON-" and not token.is_stop and
+                  not token.is_punct and not token.like_num]
+    return ' '.join(lemmatized)
 
 
 # Initialize synonym augmenter
@@ -51,13 +85,18 @@ def pad_text(texts, tokenizer):
 
 # Data loading and preprocessing
 def load_and_preprocess_data(filepath):
-    """Load data, clean text, augment text, and convert columns to boolean"""
+    """Load data, clean text, and convert columns to boolean"""
     data = pd.read_csv(filepath)
     print(f'Loaded {len(data)} records')
 
-    data[TEXT_COLUMN] = data[TEXT_COLUMN].astype(str)
-    tqdm.pandas(desc="Cleaning text")
-    data[TEXT_COLUMN] = data[TEXT_COLUMN].progress_apply(clean_text)
+    # Clean and preprocess text
+    texts = data[TEXT_COLUMN].astype(str).tolist()
+    cleaned_texts = [clean_text(text) for text in tqdm(texts, total=len(texts), desc="Cleaning text")]
+    data[TEXT_COLUMN] = cleaned_texts
+
+    # Handle missing values
+    data[TEXT_COLUMN].replace('', np.nan, inplace=True)
+    data[TEXT_COLUMN].fillna('_#_', inplace=True)
 
     augmented_texts = augment_text(data[TEXT_COLUMN], synonym_aug)
     augmented_data = pd.DataFrame({TEXT_COLUMN: augmented_texts, TOXICITY_COLUMN: 0})
