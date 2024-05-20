@@ -2,12 +2,13 @@ import warnings
 
 import numpy as np
 import pandas as pd
-from keras.src.layers import Bidirectional
+import tensorflow as tf
+from keras import Model
+from keras.src.layers import Conv1D, MaxPooling1D, Flatten, concatenate
 from sklearn import model_selection
 from sklearn.metrics import roc_auc_score
 from tensorflow.keras.initializers import Constant
-from tensorflow.keras.layers import Embedding, Input, LSTM, Dropout, Dense
-from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Embedding, Input, Dropout, Dense
 from tensorflow.keras.optimizers import RMSprop
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.preprocessing.text import Tokenizer
@@ -98,18 +99,35 @@ def load_embedding_matrix(word_index, embedding_path=EMBEDDINGS_PATH):
 
 
 # Define model structure
-def create_model(word_index):
-    embedding_layer = load_embedding_matrix(word_index)
+def create_model(tokenizer, identity_columns):
+    embedding_layer = load_embedding_matrix(tokenizer.word_index)
     sequence_input = Input(shape=(MAX_SEQUENCE_LENGTH,), dtype='int32')
     embedded_sequences = embedding_layer(sequence_input)
 
-    # Replace the original LSTM layer with a Bidirectional LSTM layer
-    x = Bidirectional(LSTM(64))(embedded_sequences)  # Adjust the number of LSTM units as needed
-    x = Bidirectional(LSTM(64))(x)
+    # CNN层
+    x = Conv1D(128, 2, activation='relu', padding='same')(embedded_sequences)
+    x = MaxPooling1D(5, padding='same')(x)
+    x = Conv1D(128, 3, activation='relu', padding='same')(x)
+    x = MaxPooling1D(5, padding='same')(x)
+    x = Conv1D(128, 4, activation='relu', padding='same')(x)
+    x = MaxPooling1D(40, padding='same')(x)
+    x = Flatten()(x)
     x = Dropout(DROPOUT_RATE)(x)
-    preds = Dense(2, activation='softmax')(x)
+    x = Dense(128, activation='relu')(x)
 
-    model = Model(sequence_input, preds)
+    # 创建identity特征的输入层
+    identity_input = Input(shape=(len(identity_columns),), dtype='float32')
+    identity_dense = Dense(32, activation='relu')(identity_input)
+
+    # 合并文本CNN输出和identity特征
+    combined = concatenate([x, identity_dense])
+
+    # 后续的全连接层和输出层
+    combined_dense = Dense(128, activation='relu')(combined)
+    preds = Dense(2, activation='softmax')(combined_dense)
+
+    # 创建模型
+    model = Model(inputs=[sequence_input, identity_input], outputs=preds)
     return model
 
 
@@ -189,10 +207,20 @@ def main():
     tokenizer = Tokenizer(num_words=MAX_NUM_WORDS)
     tokenizer.fit_on_texts(train_df[TEXT_COLUMN])
 
-    # Create and train the model
-    model, history = create_and_train_model(train_df, validate_df, tokenizer)
+    identity_columns = [
+        'male', 'female', 'homosexual_gay_or_lesbian', 'christian', 'jewish',
+        'muslim', 'black', 'white', 'psychiatric_or_mental_illness'
+    ]
+    train_identity = train_df[identity_columns].values
+    validate_identity = validate_df[identity_columns].values
 
-    model.save('Models/Bi_LSTM.h5')
+    # Create and train the model
+    model = create_model(tokenizer, identity_columns)
+    history = compile_and_train_model(model,
+                                      [pad_text(train_df[TEXT_COLUMN], tokenizer), train_identity],
+                                      to_categorical(train_df[TOXICITY_COLUMN]),
+                                      [pad_text(validate_df[TEXT_COLUMN], tokenizer), validate_identity],
+                                      to_categorical(validate_df[TOXICITY_COLUMN]))
 
     # Evaluate the model
     validate_text = pad_sequences(tokenizer.texts_to_sequences(validate_df[TEXT_COLUMN]), maxlen=MAX_SEQUENCE_LENGTH)
@@ -214,10 +242,12 @@ def main():
 
     # Predict and submit
     test = pd.read_csv('Data/test.csv')
+    test_identity = test[identity_columns].values
     submission = pd.read_csv('Data/sample_submission.csv', index_col='id')
-    submission['prediction'] = model.predict(pad_text(test[TEXT_COLUMN], tokenizer))[:, 1]
-    submission.to_csv('final_submission.csv')
+    submission['prediction'] = model.predict([pad_text(test[TEXT_COLUMN], tokenizer), test_identity])[:, 1]
+    submission.to_csv('CNN_submission.csv')
 
 
 if __name__ == '__main__':
-    main()
+    with tf.device('/GPU:0'):
+        main()

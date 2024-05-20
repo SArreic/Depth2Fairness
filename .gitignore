@@ -166,3 +166,7 @@ task_mitigation/model/bert-base-uncased/tf_model.h5
 task_mitigation/model/bert-base-uncased/model.safetensors
 task_mitigation/model/bert-base-uncased/flax_model.msgpack
 task_mitigation/model/bert-base-uncased/pytorch_model.bin
+Models/bert-base-uncased/tf_model.h5
+Models/bert-base-uncased/pytorch_model.bin
+Models/bert-base-uncased/pytorch_model.bin
+Models/bert-base-uncased/tf_model.h5
