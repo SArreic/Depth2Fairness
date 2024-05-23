@@ -269,7 +269,8 @@ for step, batch in enumerate(tqdm(test_loader, desc="validation", unit="batch"))
         
     logits = outputs[0]
     sig = torch.sigmoid(logits)
-    result = torch.mean(sig,-1) + sig[:,0]
+    #result = torch.mean(sig,-1) + sig[:,0]
+    result = torch.max(sig,1)[0]
     logits = result.detach().cpu().numpy()
     
 
